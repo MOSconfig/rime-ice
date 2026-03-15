@@ -1,77 +1,67 @@
 # Copilot Instructions for rime-ice (雾凇拼音)
 
-This is a Rime IME configuration repository — not a typical software project. There is no application code to compile or test in the traditional sense. The repo provides input method schemas, dictionaries, Lua plugins, and platform frontend configs for the [Rime Input Method Engine](https://rime.im/).
+This is a personal fork of [iDvel/rime-ice](https://github.com/iDvel/rime-ice) — a Rime IME configuration repository. It is trimmed to full-pinyin only, for macOS (Squirrel) and Windows (Weasel).
 
-## Build System
+## Upstream Sync
 
-A Go program in `others/script/` validates and processes dictionaries:
+- `origin` → `iDvel/rime-ice` (upstream)
+- `myconfig` → `MOSconfig/rime-ice` (personal)
 
 ```bash
-# Full pipeline: validate emoji, annotate pinyin, add weights, check format, sort
-cd others/script && go run main.go --rime_path "$(git rev-parse --show-toplevel)"
-
-# Sort dictionaries only
-cd others/script && go run main.go --rime_path "$(git rev-parse --show-toplevel)" s
+git fetch origin && git merge origin/main    # merge upstream updates
+git push myconfig main                        # push to personal repo
 ```
 
-CI runs this on commits containing `[build]` in the message (see `.github/workflows/release.yml`).
+Conflicts are expected in `default.yaml` (schema_list), `squirrel.yaml` (custom theme), and `rime_ice.schema.yaml` (emoji switch). Always keep the personal customizations.
+
+After merging, check if upstream added new Lua scripts or dict files referenced by `rime_ice.schema.yaml` — add them if needed, discard double-pinyin/t9 additions.
 
 ## Architecture
 
 ### Schema → Dictionary → Lua pipeline
 
-Schemas (`.schema.yaml`) are the top-level configs that define an input method. Each schema references:
-- A **dictionary** (`translator/dictionary`) — e.g., `rime_ice` loads `rime_ice.dict.yaml`
+`rime_ice.schema.yaml` is the sole input schema. It references:
+- **Dictionary**: `rime_ice.dict.yaml` (imports from `cn_dicts/`: 8105, base, ext, tencent, others)
+- **English**: `melt_eng.schema.yaml` + `melt_eng.dict.yaml` (imports `en_dicts/en`, `en_dicts/en_ext`)
+- **Radical lookup**: `radical_pinyin.schema.yaml` + `radical_pinyin.dict.yaml`
 - **Lua scripts** via `lua_processor@*name` / `lua_translator@*name` / `lua_filter@*name` — the `*` prefix loads from `lua/`
-- **OpenCC configs** (`opencc_config: emoji.json`) from `opencc/` for emoji and character conversion
-- **Symbols** via `__include: symbols_v:/symbols` or `symbols_caps_v` for special character input
-
-### Dictionary hierarchy
-
-`rime_ice.dict.yaml` and `melt_eng.dict.yaml` are index files that import sub-dictionaries:
-
-- `cn_dicts/` — Chinese: `8105` (common chars), `base` (two-char words), `ext` (extended), `tencent` (large corpus), `others`
-- `en_dicts/` — English: `en` (~20k words), `en_ext` (abbreviations/internet terms)
+- **OpenCC**: `opencc/emoji.json` for emoji conversion
+- **Symbols**: `__include: symbols_v:/symbols` for v-mode special characters
+- **Mixed vocab**: `en_dicts/cn_en.txt` for Chinese-English mixed input
 
 Dictionary entry format is tab-separated: `Word<TAB>Pinyin<TAB>Weight`
 
-```
-雾凇	wu song	500
-```
-
-### Schema variants
-
-`rime_ice.schema.yaml` is the full-pinyin master schema. Double-pinyin schemas (`double_pinyin_flypy.schema.yaml`, etc.) share the same dictionary but use a different `prism` and `speller/algebra` to map keypresses to pinyin syllables. `t9.schema.yaml` is the 9-key variant.
-
 ### Configuration hierarchy
 
-- `default.yaml` — global settings shared across schemas (punctuation, keybindings, schema list)
-- `squirrel.yaml` — macOS frontend (Squirrel) appearance and behavior
-- `weasel.yaml` — Windows frontend (Weasel) appearance and behavior
-- `user.yaml` — auto-generated build metadata, not manually edited
-- `custom_phrase.txt` — user-pinned phrases, format: `Word<TAB>Encoding<TAB>Weight`, loaded as `stabledb` (read-only, highest priority via `initial_quality: 99`)
+- `default.yaml` — global settings (punctuation, keybindings, schema list)
+- `squirrel.yaml` — macOS Squirrel appearance (Gruvbox Dark theme, Resource Han Rounded SC font)
+- `weasel.yaml` — Windows Weasel appearance
+- `custom_phrase.txt` — user-pinned phrases, format: `Word<TAB>Encoding<TAB>Weight`, loaded as `stabledb` (highest priority via `initial_quality: 99`)
 
-### Symbols files
+### Personal customizations
 
-- `symbols_v.yaml` — for full-pinyin (prefix `v`, since no pinyin syllable starts with v)
-- `symbols_caps_v.yaml` — for double-pinyin (prefix `V`, since `v` is a valid double-pinyin key)
+- Emoji off by default (`reset: 0` in rime_ice.schema.yaml switches)
+- Gruvbox Dark color scheme in `squirrel.yaml` (`preset_color_schemes/gruvbox_dark`)
+- Font: Resource Han Rounded SC Regular, 15pt
+- Flat appearance: no border, no shadow
+- Only `rime_ice` in `default.yaml` schema_list
 
 ## Key Conventions
 
 ### YAML `__include` and `__patch`
 
-Rime uses `__include` for cross-file/cross-section imports and `__patch` for overrides. This is not standard YAML — it's Rime-specific syntax:
+Rime-specific (not standard YAML) syntax for cross-file imports and overrides:
 
 ```yaml
 punctuator:
-  __include: default:/punctuator        # import entire section from default.yaml
+  __include: default:/punctuator        # import section from default.yaml
 symbols:
   __include: symbols_v:/symbols         # import from separate file
 ```
 
 ### Lua plugin pattern
 
-Lua scripts in `lua/` are referenced with `@*` prefix in schemas. They receive config parameters from a same-named YAML section in the schema:
+Lua scripts in `lua/` are referenced with `@*` prefix in schemas. Config parameters come from a same-named YAML section:
 
 ```yaml
 filters:
@@ -82,12 +72,8 @@ pin_cand_filter:              # config passed to the lua script
 
 ### OpenCC for emoji
 
-Emoji is implemented as an OpenCC conversion (not a dictionary). `opencc/emoji.json` chains `emoji.txt` and `others.txt` through `mmseg` segmentation. To add emoji, edit `opencc/emoji.txt` (format: `中文<TAB>Emoji1 Emoji2 ...`).
+Emoji is an OpenCC conversion (not a dictionary). To add emoji, edit `opencc/emoji.txt` (format: `中文<TAB>Emoji1 Emoji2 ...`).
 
 ### Color values in frontend configs
 
-Squirrel/Weasel color values are **BGR** (not RGB), 24-bit hex with `0x` prefix: `0xBBGGRR`. Alpha can be prepended: `0xAABBGGRR`.
-
-### Plum recipes
-
-`others/recipes/` contains [Plum](https://github.com/rime/plum) recipe files for distributing subsets of the config (full, cn_dicts, en_dicts, opencc, etc.).
+Squirrel/Weasel color values are **BGR** (not RGB): `0xBBGGRR`. Alpha can be prepended: `0xAABBGGRR`.
