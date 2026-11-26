@@ -21,3 +21,9 @@ cn_dicts/temp.txt
 rime_console
 rime_deployer
 rime_patch
+# grammar model (download: scripts/fetch-grammar.sh)
+*.gram
+*.gram.part*
+
+# test harness build cache
+tests/.cache/
