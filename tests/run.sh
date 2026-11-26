@@ -131,7 +131,8 @@ done 3< "$WORK/cases"
 
 # 5. Grammar model: prove the named file loaded, or prove the fallback equals no grammar.
 if [ "$GRAM" = 1 ]; then
-  grep -F "loading gram db: " "$WORK/log" | grep -qF "/$MODEL" || failed "grammar model $MODEL was not opened"
+  awk -v t="/$MODEL" 'index($0, "loading gram db: ") && substr($0, length($0) - length(t) + 1) == t { f = 1 }
+    END { exit !f }' "$WORK/log" || failed "grammar model $MODEL was not opened"
   grep -qE 'gram_db\.cc:[0-9]+\] found double array image' "$WORK/log" || failed "grammar model did not map"
   [ "$gram_cases" -gt 0 ] || failed "no @gram cases were checked"
   report_errors "" "$(engine_errors "$WORK/log" 0)"
