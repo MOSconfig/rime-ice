@@ -1,0 +1,45 @@
+# keys	mode	regex	[tags]
+# keys: key sequence; prefix "+opt,-opt:" sets switches for that row only.
+# mode: top = commit or 1st candidate matches; in5 = one of top 5 matches;
+#       none5 = top 5 is non-empty and none matches.
+# tags: @gram = needs the grammar model; @clock = output depends on the clock.
+# Basic words and sentences
+nihao	top	^你好$
+zhongguo	top	^中国$
+jintiantianqizhenhao	top	^今天天气真好$
+tamenzhengzaijinxingxitongceshi	top	^他们正在进行系统测试$
+# Fuzzy pinyin: l/n, en/eng, in/ing
+nai	in5	^来$
+lai	in5	^奶$
+renshen	in5	^人生$
+shengren	in5	^圣人$
+xingqing	in5	^心情$
+# Date and time shortcuts (lua/date_translator.lua)
+rq	top	^[0-9]{4}-[0-9]{2}-[0-9]{2}$	@clock
+sj	top	^[0-9]{2}:[0-9]{2}$	@clock
+xq	top	^星期[一二三四五六日]$	@clock
+dt	top	^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}([+-][0-9]{2}:[0-9]{2}|Z)$	@clock
+ts	top	^[0-9]{10}$	@clock
+rqzh	top	^二〇[〇一二三四五六七八九]{2}年	@clock
+rqen	top	^[0-9]{1,2} [A-Z][a-z]+ [0-9]{4}$	@clock
+# Lunar calendar (lua/lunar.lua + lua/lunar.db)
+nl	top	^[甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥]	@clock
+N19700101	top	^己酉鸡年十一月二十四$
+# Number, calculator, unicode, radical lookup, v-symbols
+R1234	top	^一千二百三十四$
+cC1+2*3	top	^7$
+U4e00	top	^一$
+uUshuishui	in5	^沝$
+vhelp	top	\(字母变体\)$
+# English
+github	top	^GitHub$
+hello	top	^hello$
+# Simplified → traditional switch (OpenCC s2t from shared data)
++traditionalization:zhongguo	top	^中國$
+# Emoji stay off by default
+nihao	none5	[😀-🙏🤣👋]
+xiaoku	none5	[😀-🙏🤣👋]
+# Grammar model
+womenxiawuyiqiqukaihuiba	top	^我们下午一起去开会吧$	@gram
+xianzaidexingshibijiaofuza	top	^现在的形势比较复杂$	@gram
+zhesuanfadeshijianfuzadushiduoshao	top	^这算法的时间复杂度是多少$	@gram
