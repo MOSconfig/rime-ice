@@ -182,6 +182,21 @@ translator:
     - xform/([nl])ue/$1ve/     # 显示为 nve lve
     - xform/(?<=[A-Z])\s(?=[A-Z])//  # 消除大写字母之间的空格
   # dictionary_exclude: [肏屄, 鸡巴]  # 如有屏蔽 NSFW 词汇需求 librime >= 1.14.0 等价于从 .dict.yaml 中删除对应词条，但不影响组句和用户词库。
+  contextual_suggestions: false  # 语法模型：参数取自上游 others/recipes/grammar.recipe.yaml
+  max_homophones: 8              # 语法模型：同音词最多保留数
+
+
+# 语法模型（万象 wanxiang-lts-zh-hans，librime-octagram），提升长句选词
+# 模型约 391 MB，不入库：运行 scripts/fetch-grammar.sh 下载到 Rime 用户目录后重新部署。
+# 缺少模型文件时日志会报错，但输入照常工作，排序与不启用语法模型时相同。
+grammar:
+  language: wanxiang-lts-zh-hans
+  collocation_max_length: 6
+  collocation_min_length: 3
+  collocation_penalty: -14
+  non_collocation_penalty: -6
+  weak_collocation_penalty: -100
+  rear_penalty: -20
 
 
 # 次翻译器，英文
