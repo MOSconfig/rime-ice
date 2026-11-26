@@ -2,7 +2,8 @@
 # keys: key sequence; prefix "+opt,-opt:" sets switches for that row only.
 # mode: top = commit or 1st candidate matches; in5 = one of top 5 matches;
 #       none5 = top 5 is non-empty and none matches.
-# tags: @gram = needs the grammar model; @clock = output depends on the clock.
+# tags: @gram = asserted only with the grammar model; @nogram = only without it;
+#       @clock = output depends on the clock (skipped in the fallback comparison).
 # Basic words and sentences
 nihao	top	^你好$
 zhongguo	top	^中国$
@@ -10,6 +11,7 @@ jintiantianqizhenhao	top	^今天天气真好$
 tamenzhengzaijinxingxitongceshi	top	^他们正在进行系统测试$
 # Fuzzy pinyin: l/n, en/eng, in/ing
 nai	in5	^来$
+nai	in5	^奶$
 lai	in5	^奶$
 renshen	in5	^人生$
 shengren	in5	^圣人$
@@ -41,5 +43,6 @@ nihao	none5	[😀-🙏🤣👋]
 xiaoku	none5	[😀-🙏🤣👋]
 # Grammar model
 womenxiawuyiqiqukaihuiba	top	^我们下午一起去开会吧$	@gram
+womenxiawuyiqiqukaihuiba	top	^我们下午一起去开会把$	@nogram
 xianzaidexingshibijiaofuza	top	^现在的形势比较复杂$	@gram
 zhesuanfadeshijianfuzadushiduoshao	top	^这算法的时间复杂度是多少$	@gram

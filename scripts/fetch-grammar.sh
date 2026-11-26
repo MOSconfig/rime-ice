@@ -17,7 +17,6 @@ NAME="wanxiang-lts-zh-hans.gram"
 URL="${GRAM_URL:-https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/$NAME}"
 SHA256="${GRAM_SHA256:-e9ddd501b7d536bc5ea1346f8f900ae49a719a05be349e0a17cb27e717143ca5}" # LTS, 2026-11-18
 DEST="${GRAM_DIR:-$ROOT}/$NAME"
-PART="$DEST.part"
 
 update=0
 case "${1:-}" in
@@ -27,12 +26,19 @@ case "${1:-}" in
 esac
 
 sha() { shasum -a 256 "$1" | cut -d' ' -f1; }
+redeploy_hint() {
+  echo "Redeploy Rime to load it. Squirrel: menu → 重新部署, or run:"
+  echo "  \"/Library/Input Methods/Squirrel.app/Contents/MacOS/Squirrel\" --reload"
+}
 
 if [ "$update" = 0 ] && [ -f "$DEST" ] && [ "$(sha "$DEST")" = "$SHA256" ]; then
   echo "$NAME is already installed and verified."
+  redeploy_hint
   exit 0
 fi
 
+# Private temp file per run, so concurrent runs never rename each other's data.
+PART="$(mktemp "$DEST.part.XXXXXX")"
 trap 'rm -f "$PART"' EXIT
 echo "Downloading $NAME (~391 MB)..."
 curl -fL --retry 3 -o "$PART" "$URL"
@@ -47,5 +53,4 @@ fi
 mv -f "$PART" "$DEST"
 echo "Installed $DEST"
 [ "$update" = 1 ] && echo "sha256: $got  (set SHA256 in scripts/fetch-grammar.sh to pin it)"
-echo "Redeploy Rime to load it (Squirrel: menu → 重新部署, or"
-echo "  \"/Library/Input Methods/Squirrel.app/Contents/MacOS/Squirrel\" --reload)."
+redeploy_hint

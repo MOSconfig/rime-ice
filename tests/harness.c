@@ -9,11 +9,26 @@
 #include <string.h>
 #include "rime_api.h"
 
-static void set_options(RimeApi* rime, RimeSessionId s, char* spec, Bool reset) {
-  for (char* opt = strtok(spec, ","); opt; opt = strtok(NULL, ",")) {
-    if (opt[0] == '+' || opt[0] == '-')
-      rime->set_option(s, opt + 1, reset ? (opt[0] == '-') : (opt[0] == '+'));
+// Apply "+opt,-opt" for one row; remember prior values so they can be restored.
+#define MAX_OPTS 8
+typedef struct { char name[64]; Bool prior; } SavedOpt;
+
+static int set_options(RimeApi* rime, RimeSessionId s, const char* spec, SavedOpt* saved) {
+  char buf[256];
+  snprintf(buf, sizeof buf, "%s", spec);
+  int n = 0;
+  for (char* opt = strtok(buf, ","); opt && n < MAX_OPTS; opt = strtok(NULL, ",")) {
+    if (opt[0] != '+' && opt[0] != '-') continue;
+    snprintf(saved[n].name, sizeof saved[n].name, "%s", opt + 1);
+    saved[n].prior = rime->get_option(s, saved[n].name);
+    rime->set_option(s, saved[n].name, opt[0] == '+');
+    n++;
   }
+  return n;
+}
+
+static void restore_options(RimeApi* rime, RimeSessionId s, SavedOpt* saved, int n) {
+  for (int i = n - 1; i >= 0; i--) rime->set_option(s, saved[i].name, saved[i].prior);
 }
 
 int main(int argc, char** argv) {
@@ -37,20 +52,19 @@ int main(int argc, char** argv) {
     fprintf(stderr, "cannot select schema %s\n", argv[3]);
     return 1;
   }
-  char line[1024], opts[256];
+  char line[1024];
+  SavedOpt saved[MAX_OPTS];
   while (fgets(line, sizeof line, stdin)) {
     line[strcspn(line, "\r\n")] = 0;
     if (!line[0]) continue;
     char* keys = line;
-    opts[0] = 0;
+    int nsaved = 0;
     char* colon = (line[0] == '+' || line[0] == '-') ? strchr(line, ':') : NULL;
-    if (colon && (size_t)(colon - line) < sizeof opts) {
-      memcpy(opts, line, colon - line);
-      opts[colon - line] = 0;
+    if (colon) {
+      *colon = 0;
+      nsaved = set_options(rime, s, line, saved);
+      *colon = ':';
       keys = colon + 1;
-      char tmp[256];
-      strcpy(tmp, opts);
-      set_options(rime, s, tmp, False);
     }
     rime->clear_composition(s);
     rime->simulate_key_sequence(s, keys);
@@ -67,7 +81,7 @@ int main(int argc, char** argv) {
       rime->free_context(&ctx);
     }
     printf("\n");
-    if (opts[0]) set_options(rime, s, opts, True);
+    restore_options(rime, s, saved, nsaved);
   }
   rime->destroy_session(s);
   rime->finalize();

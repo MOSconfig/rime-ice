@@ -43,11 +43,11 @@ bash scripts/fetch-grammar.sh --update  # 上游发布新模型后重新下载�
 
 ## 测试
 
-`tests/run.sh` 用鼠须管自带的 librime，在临时目录部署当前工作区并检查候选。它不会修改 `~/Library/Rime` 或用户词库。
+`tests/run.sh` 用鼠须管自带的 librime，在临时目录部署当前工作区并检查候选。它不复制用户词库、`build/` 和符号链接，只在仓库里写入已忽略的 `tests/.cache/`（编译好的测试程序）。
 
 ```bash
-bash tests/run.sh                    # 有模型时同时测试语法模型
-RIME_SKIP_GRAM=1 bash tests/run.sh   # 不用模型，并与「无 grammar 块」对照
+bash tests/run.sh                    # 需要已下载语法模型
+RIME_SKIP_GRAM=1 bash tests/run.sh   # 不用模型：候选必须与「无 grammar 块」完全相同
 bash tests/fetch-grammar.test.sh     # 下载脚本的校验与回退
 ```
 
