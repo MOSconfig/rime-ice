@@ -41,7 +41,9 @@ GRAM_DIR="$T/dest" GRAM_URL="file://$T/missing/$NAME" GRAM_SHA256="$PIN" \
   bash "$ROOT/scripts/fetch-grammar.sh" > "$T/b.log" 2>&1 & b=$!
 wait $a; ra=$?; wait $b; rb=$?
 check "concurrent runs: good run installs a verified file" '[ $ra = 0 ] && [ "$(sha "$T/dest/$NAME")" = "$PIN" ]'
-check "concurrent runs: failing run exits non-zero" '[ $rb != 0 ]'
+# The failing run either lost the race (exit != 0) or found the verified file
+# already installed and skipped the download; both are correct.
+check "concurrent runs: failing run fails or skips a verified file" '[ $rb != 0 ] || grep -q "already installed" "$T/b.log"'
 check "concurrent runs leave no temp file" 'no_temp'
 
 GRAM_DIR="$T/dest" bash "$ROOT/scripts/fetch-grammar.sh" --bogus > /dev/null 2>&1; rc=$?

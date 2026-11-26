@@ -2,7 +2,7 @@
 # Regression tests for this Rime config, run on a real librime engine.
 #
 #   bash tests/run.sh                  # model ON: needs wanxiang-lts-zh-hans.gram (scripts/fetch-grammar.sh)
-#   RIME_SKIP_GRAM=1 bash tests/run.sh # model OFF: fallback must equal a no-grammar control
+#   RIME_SKIP_GRAM=1 bash tests/run.sh # model OFF (only the value 1): fallback must equal a no-grammar control
 #   RIME_LIB=... RIME_SHARED=... bash tests/run.sh   # other engine / shared data
 #
 # Deploys scratch copies of the working tree into a temp dir. Never touches
@@ -20,7 +20,7 @@ MODEL="wanxiang-lts-zh-hans.gram"
 
 [ -f "$RIME_LIB" ] || { echo "librime not found: $RIME_LIB (set RIME_LIB)" >&2; exit 2; }
 [ -d "$RIME_SHARED" ] || { echo "shared data not found: $RIME_SHARED (set RIME_SHARED)" >&2; exit 2; }
-if [ -n "${RIME_SKIP_GRAM:-}" ]; then GRAM=0
+if [ "${RIME_SKIP_GRAM:-0}" = 1 ]; then GRAM=0
 elif [ -f "$ROOT/$MODEL" ]; then GRAM=1
 else echo "$MODEL not found: run scripts/fetch-grammar.sh, or set RIME_SKIP_GRAM=1" >&2; exit 2
 fi
@@ -49,29 +49,32 @@ fi
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/rime-tests.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 
-# Stage tracked + untracked-but-not-ignored regular files. Symlinks and
-# engine-writable paths (user dictionaries, user.yaml, build, sync) are never
-# copied, so librime can only open databases inside the scratch dir.
+# Stage tracked + untracked-but-not-ignored regular files, one literal path at a
+# time (no tar: bsdtar treats "@name" arguments as archives to import).
+# Symlinks and engine-writable paths (user dictionaries, user.yaml, build, sync)
+# are never copied, so librime can only open databases inside the scratch dir.
 stage() {
   mkdir -p "$1/build"
-  (cd "$ROOT" && git ls-files -z -co --exclude-standard |
+  (cd "$ROOT" && git ls-files -z -co --exclude-standard) |
     while IFS= read -r -d '' f; do
-      [ -L "$f" ] && continue
+      [ -L "$ROOT/$f" ] && continue
+      [ -f "$ROOT/$f" ] || continue
       case "$f" in *.userdb|*.userdb/*|*.userdb.txt|user.yaml|installation.yaml|build/*|sync/*) continue ;; esac
-      [ -f "$f" ] && printf '%s\0' "$f"
-    done | xargs -0 tar -cf - --) | tar -xf - -C "$1"
+      mkdir -p "$1/$(dirname -- "$f")"
+      cp -p -- "$ROOT/$f" "$1/$f"
+    done
 }
 deploy_run() { # data_dir keys_file out_file log_file
   "$CACHE/harness" "$1" "$RIME_SHARED" rime_ice < "$2" > "$3" 2> "$4"
 }
-# E lines from a log, minus the known "model file is missing" diagnostics.
+# E lines from a log, minus the three known "model file is missing" lines,
+# matched as literal line endings (no regex on paths or the model name).
 engine_errors() { # log_file allow_missing_model(0/1)
-  local e; e="$(grep -E '^E' "$1" || true)"
-  if [ "$2" = 1 ]; then
-    e="$(printf '%s\n' "$e" | grep -vE \
-      "(non-existent file|error opening gram db) '[^']*/$MODEL'|failed to load grammar database: ${MODEL%.gram}$" || true)"
-  fi
-  printf '%s' "$e"
+  grep -E '^E' "$1" | awk -v allow="$2" -v a="/$MODEL'." -v b="failed to load grammar database: ${MODEL%.gram}" '
+    function ends(s, t) { return length(s) >= length(t) && substr(s, length(s) - length(t) + 1) == t }
+    allow == 1 && (index($0, "non-existent file ") || index($0, "error opening gram db ")) && ends($0, a) { next }
+    allow == 1 && ends($0, b) { next }
+    { print }' || true
 }
 report_errors() { # label errors
   [ -z "$2" ] && return 0
@@ -128,12 +131,12 @@ done 3< "$WORK/cases"
 
 # 5. Grammar model: prove the named file loaded, or prove the fallback equals no grammar.
 if [ "$GRAM" = 1 ]; then
-  grep -qE "loading gram db: .*/$MODEL\$" "$WORK/log" || failed "grammar model $MODEL was not opened"
+  grep -F "loading gram db: " "$WORK/log" | grep -qF "/$MODEL" || failed "grammar model $MODEL was not opened"
   grep -qE 'gram_db\.cc:[0-9]+\] found double array image' "$WORK/log" || failed "grammar model did not map"
   [ "$gram_cases" -gt 0 ] || failed "no @gram cases were checked"
   report_errors "" "$(engine_errors "$WORK/log" 0)"
 else
-  grep -qE "error opening gram db '[^']*/$MODEL'" "$WORK/log" ||
+  grep -F "error opening gram db " "$WORK/log" | grep -qF "/$MODEL'." ||
     failed "expected the missing-model diagnostic for $MODEL"
   report_errors "" "$(engine_errors "$WORK/log" 1)"
   stage "$WORK/control"
